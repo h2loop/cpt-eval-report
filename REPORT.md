@@ -7,102 +7,105 @@
 
 ---
 
-## 1. Perplexity Over Training (In-Domain vs Heldout)
+## 1. Heldout Perplexity Improvement: Base vs FT (checkpoint-15k)
 
-![Perplexity Curves](assets/01_perplexity_curves.png)
+![Perplexity Improvement](assets/01_perplexity_improvement.png)
 
-Tracks overall weighted perplexity across checkpoints. The gap between in-domain and heldout curves indicates degree of overfitting.
+Percentage reduction in perplexity on **held-out** evaluation data (not seen during training). Each bar shows the improvement for a specific domain, with the base→FT perplexity values annotated. Domains are sourced from:
+
+| Domain | Source Repos / Data |
+|---|---|
+| Infineon AURIX | AURIX TC3xx SDK, iLLD drivers, IfxGtm/IfxVadc/IfxDma APIs |
+| AMD GPU Registers | AMDGPU kernel driver register definitions (DCN, SDMA, VCN, MMVM) |
+| Linux Kernel | Kernel drivers, platform/PCI subsystems, net_device_ops |
+| STM32 HAL | STM32Cube HAL/LL drivers, BSP configs, SystemClock_Config |
+| NXP MCUXpresso | NXP MCUXpresso SDK, FSL drivers, LPC/i.MX board init |
+| ARM Cortex ASM | Cortex-M startup files, NVIC/SCB handlers, vector tables |
+| Device Tree | DTS/DTSI bindings, compatible strings, peripheral nodes |
+| Wireless BLE/WiFi | ieee80211, nl80211, Bluetooth HCI, cfg80211 drivers |
+| Zephyr RTOS | Zephyr kernel primitives (k_thread, k_sem, k_work), Kconfig |
+| Crypto | wolfSSL, mbedTLS, AES/RSA implementations, crypto_alloc |
+| Register Defines | Hardware register `#define` headers (MASK/SHIFT patterns) |
+| USB Stack | USB gadget/device stack, xHCI/EHCI host drivers |
+| General | Mixed embedded C/C++ code not matching specific domains |
 
 <details>
 <summary>Graph Data (JSON)</summary>
 
 ```json
 {
-  "checkpoints": [
-    1000,
-    2000,
-    3000,
-    4000,
-    5000,
-    6000,
-    7000,
-    8000,
-    9000,
-    10000,
-    11000,
-    12000,
-    13000,
-    14000,
-    15000
-  ],
-  "indomain_base": [
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06,
-    4.06
-  ],
-  "indomain_ft": [
-    3.73,
-    4.04,
-    4.2,
-    1.41,
-    1.38,
-    4.89,
-    1.32,
-    1.3,
-    1.28,
-    5.6,
-    1.25,
-    1.24,
-    1.22,
-    5.66,
-    1.2
-  ],
-  "heldout_base": [
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92,
-    3.92
-  ],
-  "heldout_ft": [
-    3.68,
-    4.03,
-    4.17,
-    1.5,
-    1.46,
-    4.73,
-    1.42,
-    1.4,
-    1.38,
-    5.39,
-    1.37,
-    1.36,
-    1.35,
-    5.4,
-    1.33
-  ]
+  "description": "Heldout perplexity improvement (%), base vs checkpoint-15000",
+  "overall_weighted": {
+    "base": 3.92,
+    "finetuned": 1.33
+  },
+  "per_domain": {
+    "wireless_ble_wifi": {
+      "base_ppl": 7.78,
+      "ft_ppl": 1.62,
+      "improvement_pct": 79.2
+    },
+    "linux_kernel": {
+      "base_ppl": 7.93,
+      "ft_ppl": 1.72,
+      "improvement_pct": 78.3
+    },
+    "stm32_hal": {
+      "base_ppl": 5.78,
+      "ft_ppl": 1.38,
+      "improvement_pct": 76.1
+    },
+    "device_tree": {
+      "base_ppl": 4.83,
+      "ft_ppl": 1.22,
+      "improvement_pct": 74.7
+    },
+    "usb_stack": {
+      "base_ppl": 5.17,
+      "ft_ppl": 1.52,
+      "improvement_pct": 70.6
+    },
+    "nxp_imx": {
+      "base_ppl": 4.76,
+      "ft_ppl": 1.41,
+      "improvement_pct": 70.4
+    },
+    "zephyr_rtos": {
+      "base_ppl": 6.94,
+      "ft_ppl": 2.22,
+      "improvement_pct": 68.0
+    },
+    "amd_gpu_registers": {
+      "base_ppl": 2.82,
+      "ft_ppl": 1.12,
+      "improvement_pct": 60.3
+    },
+    "infineon_aurix": {
+      "base_ppl": 3.18,
+      "ft_ppl": 1.29,
+      "improvement_pct": 59.4
+    },
+    "arm_cortex_asm": {
+      "base_ppl": 2.85,
+      "ft_ppl": 1.19,
+      "improvement_pct": 58.2
+    },
+    "crypto": {
+      "base_ppl": 4.66,
+      "ft_ppl": 2.04,
+      "improvement_pct": 56.2
+    },
+    "register_defines": {
+      "base_ppl": 2.19,
+      "ft_ppl": 1.07,
+      "improvement_pct": 51.1
+    },
+    "general": {
+      "base_ppl": 2.21,
+      "ft_ppl": 1.08,
+      "improvement_pct": 51.1
+    }
+  }
 }
 ```
 </details>
@@ -566,190 +569,123 @@ Green = improvement (lower perplexity), Red = regression. Each cell shows the % 
 }
 ```
 </details>
-## 3. Completion Accuracy Over Training
+## 3. Heldout Code Completion Accuracy: Base vs FT (checkpoint-15k)
 
 ![Completion Accuracy](assets/03_completion_accuracy.png)
 
-Weighted average Top-1 and Top-5 accuracy for suffix prediction across all domains.
+Next-token prediction accuracy on held-out code. Left: absolute Top-1 accuracy per domain. Right: improvement in percentage points.
 
 <details>
 <summary>Graph Data (JSON)</summary>
 
 ```json
 {
-  "ppl_indomain": {
-    "checkpoints": [
-      1000,
-      2000,
-      3000,
-      4000,
-      5000,
-      6000,
-      7000,
-      8000,
-      9000,
-      10000,
-      11000,
-      12000,
-      13000,
-      14000,
-      15000
-    ],
-    "base_top1": [
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61,
-      73.61
-    ],
-    "ft_top1": [
-      73.55,
-      73.22,
-      72.06,
-      92.84,
-      93.39,
-      69.85,
-      94.09,
-      94.51,
-      94.75,
-      67.57,
-      95.19,
-      95.39,
-      95.57,
-      68.0,
-      95.91
-    ],
-    "base_top5": [
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29,
-      87.29
-    ],
-    "ft_top5": [
-      87.83,
-      87.72,
-      86.95,
-      97.91,
-      98.12,
-      85.9,
-      98.43,
-      98.56,
-      98.68,
-      83.89,
-      98.82,
-      98.91,
-      98.97,
-      84.2,
-      99.09
-    ]
-  },
-  "ppl_heldout": {
-    "checkpoints": [
-      1000,
-      2000,
-      3000,
-      4000,
-      5000,
-      6000,
-      7000,
-      8000,
-      9000,
-      10000,
-      11000,
-      12000,
-      13000,
-      14000,
-      15000
-    ],
-    "base_top1": [
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67,
-      74.67
-    ],
-    "ft_top1": [
-      74.31,
-      74.0,
-      72.92,
-      92.25,
-      92.73,
-      71.14,
-      93.21,
-      93.44,
-      93.64,
-      68.87,
-      94.02,
-      94.2,
-      94.36,
-      69.46,
-      94.59
-    ],
-    "base_top5": [
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74,
-      87.74
-    ],
-    "ft_top5": [
-      88.15,
-      88.04,
-      87.41,
-      97.65,
-      97.86,
-      86.53,
-      98.12,
-      98.23,
-      98.32,
-      84.63,
-      98.46,
-      98.54,
-      98.59,
-      84.92,
-      98.69
-    ]
+  "description": "Heldout code completion (suffix prediction), base vs checkpoint-15000",
+  "per_domain": {
+    "stm32_hal": {
+      "base_top1": 69.55,
+      "ft_top1": 97.89,
+      "improvement_pp": 28.34,
+      "base_top5": 85.97,
+      "ft_top5": 99.67,
+      "n_samples": 50
+    },
+    "linux_kernel": {
+      "base_top1": 61.63,
+      "ft_top1": 89.47,
+      "improvement_pp": 27.84,
+      "base_top5": 81.06,
+      "ft_top5": 97.59,
+      "n_samples": 100
+    },
+    "wireless_ble_wifi": {
+      "base_top1": 63.31,
+      "ft_top1": 89.83,
+      "improvement_pp": 26.52,
+      "base_top5": 81.44,
+      "ft_top5": 97.47,
+      "n_samples": 50
+    },
+    "device_tree": {
+      "base_top1": 72.31,
+      "ft_top1": 95.14,
+      "improvement_pp": 22.83,
+      "base_top5": 86.11,
+      "ft_top5": 98.76,
+      "n_samples": 50
+    },
+    "arm_cortex_asm": {
+      "base_top1": 75.4,
+      "ft_top1": 97.13,
+      "improvement_pp": 21.73,
+      "base_top5": 86.92,
+      "ft_top5": 99.47,
+      "n_samples": 30
+    },
+    "nxp_imx": {
+      "base_top1": 72.38,
+      "ft_top1": 93.24,
+      "improvement_pp": 20.86,
+      "base_top5": 86.47,
+      "ft_top5": 98.12,
+      "n_samples": 50
+    },
+    "zephyr_rtos": {
+      "base_top1": 64.25,
+      "ft_top1": 82.71,
+      "improvement_pp": 18.46,
+      "base_top5": 82.94,
+      "ft_top5": 94.52,
+      "n_samples": 30
+    },
+    "general": {
+      "base_top1": 81.53,
+      "ft_top1": 99.49,
+      "improvement_pp": 17.96,
+      "base_top5": 89.7,
+      "ft_top5": 99.9,
+      "n_samples": 50
+    },
+    "usb_stack": {
+      "base_top1": 73.31,
+      "ft_top1": 90.98,
+      "improvement_pp": 17.67,
+      "base_top5": 87.34,
+      "ft_top5": 97.54,
+      "n_samples": 30
+    },
+    "infineon_aurix": {
+      "base_top1": 81.45,
+      "ft_top1": 98.16,
+      "improvement_pp": 16.71,
+      "base_top5": 90.92,
+      "ft_top5": 99.35,
+      "n_samples": 100
+    },
+    "register_defines": {
+      "base_top1": 83.74,
+      "ft_top1": 99.07,
+      "improvement_pp": 15.33,
+      "base_top5": 93.35,
+      "ft_top5": 99.87,
+      "n_samples": 100
+    },
+    "crypto": {
+      "base_top1": 72.32,
+      "ft_top1": 87.58,
+      "improvement_pp": 15.26,
+      "base_top5": 88.13,
+      "ft_top5": 96.22,
+      "n_samples": 30
+    },
+    "amd_gpu_registers": {
+      "base_top1": 83.03,
+      "ft_top1": 96.35,
+      "improvement_pp": 13.32,
+      "base_top5": 91.86,
+      "ft_top5": 99.85,
+      "n_samples": 100
+    }
   }
 }
 ```
@@ -1669,92 +1605,79 @@ Left: absolute FT perplexity on in-domain vs heldout data. Right: the gap betwee
 
 ```json
 {
-  "perplexity_curves": {
-    "checkpoints": [
-      1000,
-      2000,
-      3000,
-      4000,
-      5000,
-      6000,
-      7000,
-      8000,
-      9000,
-      10000,
-      11000,
-      12000,
-      13000,
-      14000,
-      15000
-    ],
-    "indomain_base": [
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06,
-      4.06
-    ],
-    "indomain_ft": [
-      3.73,
-      4.04,
-      4.2,
-      1.41,
-      1.38,
-      4.89,
-      1.32,
-      1.3,
-      1.28,
-      5.6,
-      1.25,
-      1.24,
-      1.22,
-      5.66,
-      1.2
-    ],
-    "heldout_base": [
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92,
-      3.92
-    ],
-    "heldout_ft": [
-      3.68,
-      4.03,
-      4.17,
-      1.5,
-      1.46,
-      4.73,
-      1.42,
-      1.4,
-      1.38,
-      5.39,
-      1.37,
-      1.36,
-      1.35,
-      5.4,
-      1.33
-    ]
+  "perplexity_improvement": {
+    "description": "Heldout perplexity improvement (%), base vs checkpoint-15000",
+    "overall_weighted": {
+      "base": 3.92,
+      "finetuned": 1.33
+    },
+    "per_domain": {
+      "wireless_ble_wifi": {
+        "base_ppl": 7.78,
+        "ft_ppl": 1.62,
+        "improvement_pct": 79.2
+      },
+      "linux_kernel": {
+        "base_ppl": 7.93,
+        "ft_ppl": 1.72,
+        "improvement_pct": 78.3
+      },
+      "stm32_hal": {
+        "base_ppl": 5.78,
+        "ft_ppl": 1.38,
+        "improvement_pct": 76.1
+      },
+      "device_tree": {
+        "base_ppl": 4.83,
+        "ft_ppl": 1.22,
+        "improvement_pct": 74.7
+      },
+      "usb_stack": {
+        "base_ppl": 5.17,
+        "ft_ppl": 1.52,
+        "improvement_pct": 70.6
+      },
+      "nxp_imx": {
+        "base_ppl": 4.76,
+        "ft_ppl": 1.41,
+        "improvement_pct": 70.4
+      },
+      "zephyr_rtos": {
+        "base_ppl": 6.94,
+        "ft_ppl": 2.22,
+        "improvement_pct": 68.0
+      },
+      "amd_gpu_registers": {
+        "base_ppl": 2.82,
+        "ft_ppl": 1.12,
+        "improvement_pct": 60.3
+      },
+      "infineon_aurix": {
+        "base_ppl": 3.18,
+        "ft_ppl": 1.29,
+        "improvement_pct": 59.4
+      },
+      "arm_cortex_asm": {
+        "base_ppl": 2.85,
+        "ft_ppl": 1.19,
+        "improvement_pct": 58.2
+      },
+      "crypto": {
+        "base_ppl": 4.66,
+        "ft_ppl": 2.04,
+        "improvement_pct": 56.2
+      },
+      "register_defines": {
+        "base_ppl": 2.19,
+        "ft_ppl": 1.07,
+        "improvement_pct": 51.1
+      },
+      "general": {
+        "base_ppl": 2.21,
+        "ft_ppl": 1.08,
+        "improvement_pct": 51.1
+      }
+    }
   },
   "perplexity_heatmap": {
     "ppl_indomain": {
@@ -2205,179 +2128,112 @@ Left: absolute FT perplexity on in-domain vs heldout data. Right: the gap betwee
     }
   },
   "completion_accuracy": {
-    "ppl_indomain": {
-      "checkpoints": [
-        1000,
-        2000,
-        3000,
-        4000,
-        5000,
-        6000,
-        7000,
-        8000,
-        9000,
-        10000,
-        11000,
-        12000,
-        13000,
-        14000,
-        15000
-      ],
-      "base_top1": [
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61,
-        73.61
-      ],
-      "ft_top1": [
-        73.55,
-        73.22,
-        72.06,
-        92.84,
-        93.39,
-        69.85,
-        94.09,
-        94.51,
-        94.75,
-        67.57,
-        95.19,
-        95.39,
-        95.57,
-        68.0,
-        95.91
-      ],
-      "base_top5": [
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29,
-        87.29
-      ],
-      "ft_top5": [
-        87.83,
-        87.72,
-        86.95,
-        97.91,
-        98.12,
-        85.9,
-        98.43,
-        98.56,
-        98.68,
-        83.89,
-        98.82,
-        98.91,
-        98.97,
-        84.2,
-        99.09
-      ]
-    },
-    "ppl_heldout": {
-      "checkpoints": [
-        1000,
-        2000,
-        3000,
-        4000,
-        5000,
-        6000,
-        7000,
-        8000,
-        9000,
-        10000,
-        11000,
-        12000,
-        13000,
-        14000,
-        15000
-      ],
-      "base_top1": [
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67,
-        74.67
-      ],
-      "ft_top1": [
-        74.31,
-        74.0,
-        72.92,
-        92.25,
-        92.73,
-        71.14,
-        93.21,
-        93.44,
-        93.64,
-        68.87,
-        94.02,
-        94.2,
-        94.36,
-        69.46,
-        94.59
-      ],
-      "base_top5": [
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74,
-        87.74
-      ],
-      "ft_top5": [
-        88.15,
-        88.04,
-        87.41,
-        97.65,
-        97.86,
-        86.53,
-        98.12,
-        98.23,
-        98.32,
-        84.63,
-        98.46,
-        98.54,
-        98.59,
-        84.92,
-        98.69
-      ]
+    "description": "Heldout code completion (suffix prediction), base vs checkpoint-15000",
+    "per_domain": {
+      "stm32_hal": {
+        "base_top1": 69.55,
+        "ft_top1": 97.89,
+        "improvement_pp": 28.34,
+        "base_top5": 85.97,
+        "ft_top5": 99.67,
+        "n_samples": 50
+      },
+      "linux_kernel": {
+        "base_top1": 61.63,
+        "ft_top1": 89.47,
+        "improvement_pp": 27.84,
+        "base_top5": 81.06,
+        "ft_top5": 97.59,
+        "n_samples": 100
+      },
+      "wireless_ble_wifi": {
+        "base_top1": 63.31,
+        "ft_top1": 89.83,
+        "improvement_pp": 26.52,
+        "base_top5": 81.44,
+        "ft_top5": 97.47,
+        "n_samples": 50
+      },
+      "device_tree": {
+        "base_top1": 72.31,
+        "ft_top1": 95.14,
+        "improvement_pp": 22.83,
+        "base_top5": 86.11,
+        "ft_top5": 98.76,
+        "n_samples": 50
+      },
+      "arm_cortex_asm": {
+        "base_top1": 75.4,
+        "ft_top1": 97.13,
+        "improvement_pp": 21.73,
+        "base_top5": 86.92,
+        "ft_top5": 99.47,
+        "n_samples": 30
+      },
+      "nxp_imx": {
+        "base_top1": 72.38,
+        "ft_top1": 93.24,
+        "improvement_pp": 20.86,
+        "base_top5": 86.47,
+        "ft_top5": 98.12,
+        "n_samples": 50
+      },
+      "zephyr_rtos": {
+        "base_top1": 64.25,
+        "ft_top1": 82.71,
+        "improvement_pp": 18.46,
+        "base_top5": 82.94,
+        "ft_top5": 94.52,
+        "n_samples": 30
+      },
+      "general": {
+        "base_top1": 81.53,
+        "ft_top1": 99.49,
+        "improvement_pp": 17.96,
+        "base_top5": 89.7,
+        "ft_top5": 99.9,
+        "n_samples": 50
+      },
+      "usb_stack": {
+        "base_top1": 73.31,
+        "ft_top1": 90.98,
+        "improvement_pp": 17.67,
+        "base_top5": 87.34,
+        "ft_top5": 97.54,
+        "n_samples": 30
+      },
+      "infineon_aurix": {
+        "base_top1": 81.45,
+        "ft_top1": 98.16,
+        "improvement_pp": 16.71,
+        "base_top5": 90.92,
+        "ft_top5": 99.35,
+        "n_samples": 100
+      },
+      "register_defines": {
+        "base_top1": 83.74,
+        "ft_top1": 99.07,
+        "improvement_pp": 15.33,
+        "base_top5": 93.35,
+        "ft_top5": 99.87,
+        "n_samples": 100
+      },
+      "crypto": {
+        "base_top1": 72.32,
+        "ft_top1": 87.58,
+        "improvement_pp": 15.26,
+        "base_top5": 88.13,
+        "ft_top5": 96.22,
+        "n_samples": 30
+      },
+      "amd_gpu_registers": {
+        "base_top1": 83.03,
+        "ft_top1": 96.35,
+        "improvement_pp": 13.32,
+        "base_top5": 91.86,
+        "ft_top5": 99.85,
+        "n_samples": 100
+      }
     }
   },
   "generative_training_curves": {

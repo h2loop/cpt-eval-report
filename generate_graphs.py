@@ -78,64 +78,121 @@ def save_fig(fig, name):
 # 1. PERPLEXITY IMPROVEMENT OVER TRAINING (line chart)
 # ============================================================================
 
-def graph_perplexity_curves():
-    """Overall weighted perplexity: in-domain vs heldout over checkpoints."""
-    fig, ax = plt.subplots(figsize=(12, 5))
+def graph_perplexity_improvement():
+    """Simple bar chart: % perplexity improvement on heldout data, base vs ckpt-15k."""
+    ppl = DATA["ppl_heldout"].get("15000", {}).get("perplexity", {})
 
-    indomain_base, indomain_ft, heldout_base, heldout_ft = [], [], [], []
-    ckpts_id, ckpts_ho = [], []
-
-    for ckpt in CHECKPOINTS:
-        sk = str(ckpt)
-        # In-domain
-        pid = DATA["ppl_indomain"].get(sk, {}).get("perplexity", {})
-        ow = pid.get("overall_weighted", {})
-        if ow:
-            ckpts_id.append(ckpt)
-            indomain_base.append(ow.get("base", None))
-            indomain_ft.append(ow.get("finetuned", None))
-        # Heldout
-        pho = DATA["ppl_heldout"].get(sk, {}).get("perplexity", {})
-        ow2 = pho.get("overall_weighted", {})
-        if ow2:
-            ckpts_ho.append(ckpt)
-            heldout_base.append(ow2.get("base", None))
-            heldout_ft.append(ow2.get("finetuned", None))
-
-    ax.axhline(y=indomain_base[0], color=COLORS["base"], linestyle="--", alpha=0.5, label="Base (in-domain)")
-    ax.plot(ckpts_id, indomain_ft, "o-", color=COLORS["indomain"], label="FT (in-domain)", linewidth=2)
-    if heldout_base:
-        ax.axhline(y=heldout_base[0], color=COLORS["heldout"], linestyle="--", alpha=0.5, label="Base (heldout)")
-        ax.plot(ckpts_ho, heldout_ft, "s-", color=COLORS["heldout"], label="FT (heldout)", linewidth=2)
-
-    ax.set_xlabel("Checkpoint Step")
-    ax.set_ylabel("Perplexity (lower is better)")
-    ax.set_title("Overall Weighted Perplexity: In-Domain vs Heldout")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    ax.set_xticks(CHECKPOINTS)
-    ax.set_xticklabels([f"{c//1000}k" for c in CHECKPOINTS], rotation=45)
-
-    path = save_fig(fig, "01_perplexity_curves")
-
-    GRAPH_DATA["perplexity_curves"] = {
-        "checkpoints": ckpts_id,
-        "indomain_base": indomain_base,
-        "indomain_ft": indomain_ft,
-        "heldout_base": heldout_base,
-        "heldout_ft": heldout_ft,
+    # Domain labels mapping to source repos/descriptions
+    DOMAIN_LABELS = {
+        "infineon_aurix": "Infineon AURIX TC3xx\nSDK & Drivers",
+        "amd_gpu_registers": "AMD GPU Register\nDefinitions (AMDGPU)",
+        "linux_kernel": "Linux Kernel\nDrivers & Subsystems",
+        "stm32_hal": "STM32 HAL &\nCubeMX BSP",
+        "nxp_imx": "NXP MCUXpresso\nSDK (i.MX/LPC)",
+        "arm_cortex_asm": "ARM Cortex-M\nStartup & ASM",
+        "device_tree": "Device Tree\nBindings (DTS)",
+        "wireless_ble_wifi": "Wireless Stack\n(BLE/WiFi/802.11)",
+        "zephyr_rtos": "Zephyr RTOS\nKernel & Drivers",
+        "crypto": "Crypto Libraries\n(wolfSSL/mbedTLS)",
+        "register_defines": "HW Register\n#define Headers",
+        "usb_stack": "USB Stack\n(xHCI/Gadget)",
+        "general": "General Embedded\nC/C++ Code",
     }
-    MD_SECTIONS.append(f"""## 1. Perplexity Over Training (In-Domain vs Heldout)
 
-![Perplexity Curves]({path})
+    domains_sorted = []
+    improvements = []
+    base_ppls = []
+    ft_ppls = []
 
-Tracks overall weighted perplexity across checkpoints. The gap between in-domain and heldout curves indicates degree of overfitting.
+    for dom in DOMAINS:
+        entry = ppl.get(dom, {})
+        imp = entry.get("improvement_pct", None)
+        if imp is not None:
+            domains_sorted.append(dom)
+            improvements.append(imp)
+            base_ppls.append(entry.get("base", 0))
+            ft_ppls.append(entry.get("finetuned", 0))
+
+    # Sort by improvement descending
+    order = sorted(range(len(improvements)), key=lambda i: improvements[i], reverse=True)
+    domains_sorted = [domains_sorted[i] for i in order]
+    improvements = [improvements[i] for i in order]
+    base_ppls = [base_ppls[i] for i in order]
+    ft_ppls = [ft_ppls[i] for i in order]
+
+    fig, ax = plt.subplots(figsize=(14, 6))
+    x = np.arange(len(domains_sorted))
+    colors = ["#2ecc71" if v > 0 else "#e74c3c" for v in improvements]
+    bars = ax.bar(x, improvements, color=colors, edgecolor="white", linewidth=0.5)
+
+    # Add value labels on bars
+    for bar, val, bppl, fppl in zip(bars, improvements, base_ppls, ft_ppls):
+        y = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2, y + 1,
+                f"{val:.1f}%", ha="center", va="bottom", fontsize=9, fontweight="bold")
+        ax.text(bar.get_x() + bar.get_width()/2, y/2,
+                f"{bppl:.1f}→{fppl:.1f}", ha="center", va="center", fontsize=7,
+                color="white", fontweight="bold")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([DOMAIN_LABELS.get(d, d) for d in domains_sorted],
+                       rotation=45, ha="right", fontsize=8)
+    ax.set_ylabel("Perplexity Improvement (%)")
+    ax.set_title("Heldout Perplexity Improvement: Base → FT (checkpoint-15k)", fontsize=14, pad=15)
+    ax.grid(True, alpha=0.2, axis="y")
+    ax.set_ylim(0, max(improvements) + 10)
+
+    # Overall weighted
+    ow = ppl.get("overall_weighted", {})
+    if ow:
+        ow_base = ow["base"]
+        ow_ft = ow["finetuned"]
+        ow_imp = (1 - ow_ft / ow_base) * 100
+        ax.axhline(y=ow_imp, color="#3498db", linestyle="--", linewidth=2, alpha=0.7)
+        ax.text(len(domains_sorted) - 0.5, ow_imp + 1.5,
+                f"Overall: {ow_imp:.1f}% ({ow_base:.2f}→{ow_ft:.2f})",
+                ha="right", fontsize=10, color="#3498db", fontweight="bold")
+
+    fig.tight_layout()
+    path = save_fig(fig, "01_perplexity_improvement")
+
+    graph_json = {
+        "description": "Heldout perplexity improvement (%), base vs checkpoint-15000",
+        "overall_weighted": {"base": ow.get("base"), "finetuned": ow.get("finetuned")},
+        "per_domain": {
+            dom: {"base_ppl": bppl, "ft_ppl": fppl, "improvement_pct": imp}
+            for dom, bppl, fppl, imp in zip(domains_sorted, base_ppls, ft_ppls, improvements)
+        }
+    }
+    GRAPH_DATA["perplexity_improvement"] = graph_json
+
+    MD_SECTIONS.append(f"""## 1. Heldout Perplexity Improvement: Base vs FT (checkpoint-15k)
+
+![Perplexity Improvement]({path})
+
+Percentage reduction in perplexity on **held-out** evaluation data (not seen during training). Each bar shows the improvement for a specific domain, with the base→FT perplexity values annotated. Domains are sourced from:
+
+| Domain | Source Repos / Data |
+|---|---|
+| Infineon AURIX | AURIX TC3xx SDK, iLLD drivers, IfxGtm/IfxVadc/IfxDma APIs |
+| AMD GPU Registers | AMDGPU kernel driver register definitions (DCN, SDMA, VCN, MMVM) |
+| Linux Kernel | Kernel drivers, platform/PCI subsystems, net_device_ops |
+| STM32 HAL | STM32Cube HAL/LL drivers, BSP configs, SystemClock_Config |
+| NXP MCUXpresso | NXP MCUXpresso SDK, FSL drivers, LPC/i.MX board init |
+| ARM Cortex ASM | Cortex-M startup files, NVIC/SCB handlers, vector tables |
+| Device Tree | DTS/DTSI bindings, compatible strings, peripheral nodes |
+| Wireless BLE/WiFi | ieee80211, nl80211, Bluetooth HCI, cfg80211 drivers |
+| Zephyr RTOS | Zephyr kernel primitives (k_thread, k_sem, k_work), Kconfig |
+| Crypto | wolfSSL, mbedTLS, AES/RSA implementations, crypto_alloc |
+| Register Defines | Hardware register `#define` headers (MASK/SHIFT patterns) |
+| USB Stack | USB gadget/device stack, xHCI/EHCI host drivers |
+| General | Mixed embedded C/C++ code not matching specific domains |
 
 <details>
 <summary>Graph Data (JSON)</summary>
 
 ```json
-{json.dumps(GRAPH_DATA["perplexity_curves"], indent=2)}
+{json.dumps(graph_json, indent=2)}
 ```
 </details>
 """)
@@ -228,100 +285,116 @@ Green = improvement (lower perplexity), Red = regression. Each cell shows the % 
 # ============================================================================
 
 def graph_completion_accuracy():
-    """Top-1 and Top-5 accuracy across checkpoints (weighted average)."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    """Per-domain code completion accuracy: base vs FT-15k on heldout data."""
+    comp = DATA["ppl_heldout"].get("15000", {}).get("completion", {})
 
-    for source_key, ax, title in [
-        ("ppl_indomain", ax1, "In-Domain Completion Accuracy"),
-        ("ppl_heldout", ax2, "Heldout Completion Accuracy"),
-    ]:
-        base_t1, ft_t1, base_t5, ft_t5 = [], [], [], []
-        valid_ckpts = []
-        for ckpt in CHECKPOINTS:
-            sk = str(ckpt)
-            comp = DATA[source_key].get(sk, {}).get("completion", {})
-            if not comp:
-                continue
+    DOMAIN_LABELS = {
+        "infineon_aurix": "Infineon AURIX\nSDK & Drivers",
+        "amd_gpu_registers": "AMD GPU Register\nDefinitions",
+        "linux_kernel": "Linux Kernel\nDrivers",
+        "stm32_hal": "STM32 HAL\nDrivers",
+        "nxp_imx": "NXP MCUXpresso\nSDK",
+        "arm_cortex_asm": "ARM Cortex-M\nStartup/ASM",
+        "device_tree": "Device Tree\nBindings",
+        "wireless_ble_wifi": "Wireless Stack\nBLE/WiFi",
+        "zephyr_rtos": "Zephyr RTOS\nKernel",
+        "crypto": "Crypto Libraries\nwolfSSL/mbedTLS",
+        "register_defines": "HW Register\n#define Headers",
+        "usb_stack": "USB Stack\nxHCI/Gadget",
+        "general": "General Embedded\nC/C++",
+    }
 
-            # Weighted average across domains
-            total_n = 0
-            sum_bt1, sum_ft1, sum_bt5, sum_ft5 = 0, 0, 0, 0
-            for dom, vals in comp.items():
-                if not isinstance(vals, dict) or "n" not in vals:
-                    continue
-                n = vals["n"]
-                total_n += n
-                sum_bt1 += vals.get("base_top1", 0) * n
-                sum_ft1 += vals.get("ft_top1", 0) * n
-                sum_bt5 += vals.get("base_top5", 0) * n
-                sum_ft5 += vals.get("ft_top5", 0) * n
-
-            if total_n > 0:
-                valid_ckpts.append(ckpt)
-                base_t1.append(sum_bt1 / total_n * 100)
-                ft_t1.append(sum_ft1 / total_n * 100)
-                base_t5.append(sum_bt5 / total_n * 100)
-                ft_t5.append(sum_ft5 / total_n * 100)
-
-        if not valid_ckpts:
+    domains_data = []
+    for dom in DOMAINS:
+        entry = comp.get(dom, {})
+        if not isinstance(entry, dict) or "n" not in entry:
             continue
+        domains_data.append({
+            "domain": dom,
+            "base_top1": entry.get("base_top1", 0) * 100,
+            "ft_top1": entry.get("ft_top1", 0) * 100,
+            "base_top5": entry.get("base_top5", 0) * 100,
+            "ft_top5": entry.get("ft_top5", 0) * 100,
+            "n": entry.get("n", 0),
+        })
 
-        ax.axhline(y=base_t1[0], color=COLORS["base"], linestyle="--", alpha=0.5, label="Base Top-1")
-        ax.plot(valid_ckpts, ft_t1, "o-", color=COLORS["ft"], label="FT Top-1", linewidth=2)
-        ax.axhline(y=base_t5[0], color=COLORS["base"], linestyle=":", alpha=0.5, label="Base Top-5")
-        ax.plot(valid_ckpts, ft_t5, "s-", color=COLORS["heldout"], label="FT Top-5", linewidth=2)
+    # Sort by FT top-1 improvement descending
+    domains_data.sort(key=lambda d: d["ft_top1"] - d["base_top1"], reverse=True)
 
-        ax.set_xlabel("Checkpoint Step")
-        ax.set_ylabel("Accuracy (%)")
-        ax.set_title(title)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_xticks(CHECKPOINTS)
-        ax.set_xticklabels([f"{c//1000}k" for c in CHECKPOINTS], rotation=45)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 6))
 
+    # --- Top-1 Accuracy ---
+    doms = [d["domain"] for d in domains_data]
+    base_t1 = [d["base_top1"] for d in domains_data]
+    ft_t1 = [d["ft_top1"] for d in domains_data]
+    x = np.arange(len(doms))
+    w = 0.35
+
+    bars1 = ax1.bar(x - w/2, base_t1, w, label="Base", color=COLORS["base"], alpha=0.8)
+    bars2 = ax1.bar(x + w/2, ft_t1, w, label="FT (ckpt-15k)", color=COLORS["ft"], alpha=0.8)
+
+    for bar, val in zip(bars1, base_t1):
+        ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+                 f"{val:.1f}", ha="center", va="bottom", fontsize=7, color=COLORS["base"])
+    for bar, val in zip(bars2, ft_t1):
+        ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+                 f"{val:.1f}", ha="center", va="bottom", fontsize=7, color=COLORS["ft"])
+
+    ax1.set_xticks(x)
+    ax1.set_xticklabels([DOMAIN_LABELS.get(d, d) for d in doms], rotation=45, ha="right", fontsize=7)
+    ax1.set_ylabel("Top-1 Accuracy (%)")
+    ax1.set_title("Next-Token Prediction Accuracy (Top-1)")
+    ax1.legend()
+    ax1.grid(True, alpha=0.2, axis="y")
+    ax1.set_ylim(50, 105)
+
+    # --- Top-1 Improvement ---
+    improvements = [ft - base for ft, base in zip(ft_t1, base_t1)]
+    colors = ["#2ecc71" if v > 0 else "#e74c3c" for v in improvements]
+    bars3 = ax2.bar(x, improvements, color=colors, edgecolor="white", linewidth=0.5)
+
+    for bar, val in zip(bars3, improvements):
+        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+                 f"+{val:.1f}pp", ha="center", va="bottom", fontsize=8, fontweight="bold")
+
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([DOMAIN_LABELS.get(d, d) for d in doms], rotation=45, ha="right", fontsize=7)
+    ax2.set_ylabel("Top-1 Accuracy Improvement (pp)")
+    ax2.set_title("Code Completion Improvement: FT vs Base")
+    ax2.grid(True, alpha=0.2, axis="y")
+    ax2.set_ylim(0, max(improvements) + 5)
+
+    fig.suptitle("Heldout Code Completion Accuracy: Base vs FT (checkpoint-15k)", fontsize=14, y=1.02)
     fig.tight_layout()
     path = save_fig(fig, "03_completion_accuracy")
 
-    # Collect data
-    comp_data = {}
-    for source_key in ["ppl_indomain", "ppl_heldout"]:
-        cd = {"checkpoints": [], "base_top1": [], "ft_top1": [], "base_top5": [], "ft_top5": []}
-        for ckpt in CHECKPOINTS:
-            sk = str(ckpt)
-            comp = DATA[source_key].get(sk, {}).get("completion", {})
-            if not comp:
-                continue
-            total_n = 0
-            sums = [0, 0, 0, 0]
-            for dom, vals in comp.items():
-                if not isinstance(vals, dict) or "n" not in vals:
-                    continue
-                n = vals["n"]
-                total_n += n
-                sums[0] += vals.get("base_top1", 0) * n
-                sums[1] += vals.get("ft_top1", 0) * n
-                sums[2] += vals.get("base_top5", 0) * n
-                sums[3] += vals.get("ft_top5", 0) * n
-            if total_n:
-                cd["checkpoints"].append(ckpt)
-                cd["base_top1"].append(round(sums[0] / total_n * 100, 2))
-                cd["ft_top1"].append(round(sums[1] / total_n * 100, 2))
-                cd["base_top5"].append(round(sums[2] / total_n * 100, 2))
-                cd["ft_top5"].append(round(sums[3] / total_n * 100, 2))
-        comp_data[source_key] = cd
-    GRAPH_DATA["completion_accuracy"] = comp_data
+    graph_json = {
+        "description": "Heldout code completion (suffix prediction), base vs checkpoint-15000",
+        "per_domain": {
+            d["domain"]: {
+                "base_top1": round(d["base_top1"], 2),
+                "ft_top1": round(d["ft_top1"], 2),
+                "improvement_pp": round(d["ft_top1"] - d["base_top1"], 2),
+                "base_top5": round(d["base_top5"], 2),
+                "ft_top5": round(d["ft_top5"], 2),
+                "n_samples": d["n"],
+            }
+            for d in domains_data
+        }
+    }
+    GRAPH_DATA["completion_accuracy"] = graph_json
 
-    MD_SECTIONS.append(f"""## 3. Completion Accuracy Over Training
+    MD_SECTIONS.append(f"""## 3. Heldout Code Completion Accuracy: Base vs FT (checkpoint-15k)
 
 ![Completion Accuracy]({path})
 
-Weighted average Top-1 and Top-5 accuracy for suffix prediction across all domains.
+Next-token prediction accuracy on held-out code. Left: absolute Top-1 accuracy per domain. Right: improvement in percentage points.
 
 <details>
 <summary>Graph Data (JSON)</summary>
 
 ```json
-{json.dumps(GRAPH_DATA["completion_accuracy"], indent=2)}
+{json.dumps(graph_json, indent=2)}
 ```
 </details>
 """)
@@ -827,8 +900,8 @@ Left: absolute FT perplexity on in-domain vs heldout data. Right: the gap betwee
 def main():
     print("Generating graphs...")
 
-    graph_perplexity_curves()
-    print("  [1/9] Perplexity curves")
+    graph_perplexity_improvement()
+    print("  [1/9] Perplexity improvement")
 
     graph_perplexity_heatmap()
     print("  [2/9] Perplexity heatmap")
